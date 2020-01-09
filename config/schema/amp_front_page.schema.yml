@@ -1,0 +1,18 @@
+amp.theme:
+  type: config_object
+  label: 'AMP theme settings'
+  mapping:
+    amp_front_page_pattern:
+      type: string
+      label: 'Enable page'
+    amp_front_page_pattern_disable:
+      type: string
+      label: 'Disable page'
+
+block.block.*.third_party.amp_front_page:
+  type: mapping
+  label: 'AMP setting amp_front_page.'
+  mapping:
+    amp_mode:
+      type: boolean
+      label: 'AMP recreate html to amp html.'

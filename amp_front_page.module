@@ -1,0 +1,110 @@
+<?php
+
+use Drupal\Core\Render\Element;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Block\BlockPluginInterface;
+use Drupal\Core\Url;
+use Drupal\block\Entity\Block;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+
+/**
+ * Implements hook_block_view_alter().
+ */
+function amp_front_page_block_view_alter(array &$build, BlockPluginInterface $block) {
+  $amp_context = \Drupal::service('router.amp_context');
+  $amp_mode = $build['#block']->getThirdPartySetting('amp_front_page', 'amp_mode');
+  if ($amp_mode && $amp_context->isAmpRoute()) {
+    $build['#pre_render'][] = 'amp_front_page_convert_to_amp_html';
+  }
+}
+
+/**
+ * Pre-render callback: Convert html to amp html.
+ *
+ * @param array $build
+ *
+ * @return array mixed
+ */
+function amp_front_page_convert_to_amp_html($build) {
+  $amp_utilities = \Drupal::service('amp.utilities');
+  foreach (Element::children($build['content']) as $item) {
+    if (isset($build['content'][$item]['#items'])) {
+      foreach ($build['content'][$item]['#items']->getIterator() as $list_item) {
+        $name = $list_item->getName();
+        if (isset($build['content'][$item][$name]['#text'])) {
+          $amp = $amp_utilities->createAMPConverter();
+          $amp->loadHtml($build['content'][$item][$name]['#text']);
+          $build['content'][$item][$name]['#text'] = $amp->convertToAmpHtml();
+        }
+      }
+    }
+  }
+
+  return $build;
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function amp_front_page_form_block_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  $block = $form_state->getFormObject()->getEntity();
+  $form['amp_mode'] = [
+    '#type' => 'checkbox',
+    '#title' => t('AMP recreate html to amp html.'),
+    '#description' => t('If block has html code without amp tag.'),
+    '#default_value' => $block->getThirdPartySetting('amp_front_page', 'amp_mode'),
+  ];
+  $form['#entity_builders'][] = 'amp_front_page_form_block_form_builder';
+}
+
+/**
+ * Entity builder for the block config entity.
+ */
+function amp_front_page_form_block_form_builder($entity_type, Block $block, &$form, FormStateInterface $form_state) {
+  if ($amp_mode = $form_state->getValue('amp_mode')) {
+    $block->setThirdPartySetting('amp_front_page', 'amp_mode', $amp_mode);
+    return;
+  }
+  $block->unsetThirdPartySetting('amp_front_page', 'amp_mode');
+}
+
+/**
+ * Implements hook_page_attachments().
+ */
+function amp_front_page_page_attachments(&$page) {
+  $checker = \Drupal::service('amp_front_page.page_check');
+  $address_str = \Drupal::service('router.request_context')->getPathInfo();
+  if ($checker->check($address_str)) {
+    $match = $checker->getCurrentRouteMatch();
+    $url = Url::fromRouteMatch($match);
+    $res = $url->setAbsolute()->toString();
+    $amp_href = \Drupal::service('amp.query_parameters')->add($res);
+    $page['#attached']['html_head_link'][] = [
+      [
+        'rel' => 'amphtml',
+        'href' => $amp_href,
+      ],
+      TRUE,
+    ];
+  }
+}
+
+/**
+ * Implements hook_entity_view_alter().
+ */
+function amp_front_page_entity_view_alter(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display) {
+  $checker = \Drupal::service('amp_front_page.page_check');
+  $address_str = \Drupal::service('router.request_context')->getPathInfo();
+  if (!$checker->check($address_str)) {
+    // Previous exit.
+    if (empty($build['#attached']['html_head_link'])) {
+      return;
+    }
+    foreach ($build['#attached']['html_head_link'] as $key => $item) {
+      if (isset($item[0]['rel']) && $item[0]['rel'] == 'amphtml') {
+        unset($build['#attached']['html_head_link'][$key]);
+      }
+    }
+  }
+}

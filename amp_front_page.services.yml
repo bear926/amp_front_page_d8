@@ -1,0 +1,12 @@
+services:
+  amp_front_page.route_subscriber:
+    class: Drupal\amp_front_page\Routing\RouteSubscriber
+    tags:
+      - { name: event_subscriber }
+  amp_front_page.dynamic_page:
+    class: Drupal\amp_front_page\EventSubscriber\DynamicPage
+    tags:
+       - { name: event_subscriber }
+  amp_front_page.page_check:
+    class: Drupal\amp_front_page\PageCheck
+    arguments: ['@current_route_match', '@path.matcher']

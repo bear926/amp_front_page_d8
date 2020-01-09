@@ -1,0 +1,7 @@
+name: AMP Front Page
+type: module
+description: Enable amp for front page.
+core: 8.x
+package: Other
+dependencies:
+  - amp
